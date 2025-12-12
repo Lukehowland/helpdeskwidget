@@ -36,10 +36,12 @@
                 // Verify origin if needed
                 // if (event.origin !== 'https://your-helpdesk-url.com') return;
                 
-                if (event.data && event.data.type === 'helpdesk-resize') {
+                // El widget envía 'widget-resize' como tipo de mensaje
+                if (event.data && event.data.type === 'widget-resize') {
                     const iframe = document.getElementById('helpdesk-widget-iframe');
                     if (iframe && event.data.height) {
                         iframe.style.height = event.data.height + 'px';
+                        console.log('[HelpdeskWidget] Resized to:', event.data.height);
                     }
                 }
             });

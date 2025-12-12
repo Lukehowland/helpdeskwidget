@@ -1,14 +1,22 @@
-# Helpdesk Widget para Laravel
+# 🎫 Helpdesk Widget para Laravel
 
 Widget embebible para integrar el sistema de tickets de Helpdesk en proyectos Laravel externos.
 
-## Requisitos
+## ✨ Características
+
+- 🔐 Autenticación automática/manual con Helpdesk
+- 📱 Widget responsive embebido en iframe
+- 🎨 Compatible con AdminLTE v3
+- 🔧 Comando de instalación incluido
+- 📐 Altura dinámica via postMessage
+
+## 📋 Requisitos
 
 - PHP 8.2+
 - Laravel 11.x o 12.x
 - Guzzle HTTP Client
 
-## Instalación
+## 🚀 Instalación
 
 ### 1. Instalar el paquete
 
@@ -16,11 +24,17 @@ Widget embebible para integrar el sistema de tickets de Helpdesk en proyectos La
 composer require lukehowland/helpdeskwidget
 ```
 
-### 2. Publicar la configuración (opcional)
+### 2. Ejecutar el instalador
 
 ```bash
-php artisan vendor:publish --tag=helpdeskwidget-config
+php artisan helpdeskwidget:install
 ```
+
+Este comando:
+- ✅ Publica `config/helpdeskwidget.php`
+- ✅ Crea `resources/views/helpdesk.blade.php`
+- ✅ Agrega ruta `/helpdesk` a `routes/web.php`
+- ✅ Muestra instrucciones para AdminLTE
 
 ### 3. Configurar variables de entorno
 
@@ -33,18 +47,45 @@ HELPDESK_API_KEY=tu-api-key-aqui
 
 > **Nota**: El API Key es proporcionado por el administrador de Helpdesk cuando registra tu empresa.
 
-## Uso Básico
+### 4. Limpiar caché
 
-### En una vista Blade
-
-```blade
-{{-- En cualquier vista donde el usuario esté autenticado --}}
-<x-helpdesk-widget />
+```bash
+php artisan config:clear
 ```
 
-### Con parámetros personalizados
+### 5. ¡Listo!
+
+Visita `/helpdesk` en tu navegador.
+
+---
+
+## 🛠️ Opciones del Instalador
+
+```bash
+# Instalación básica
+php artisan helpdeskwidget:install
+
+# Sobrescribir archivos existentes
+php artisan helpdeskwidget:install --force
+
+# No agregar ruta automáticamente
+php artisan helpdeskwidget:install --skip-route
+
+# No mostrar instrucciones de AdminLTE
+php artisan helpdeskwidget:install --skip-adminlte
+```
+
+---
+
+## 📦 Uso Manual (sin instalador)
+
+### En cualquier vista Blade
 
 ```blade
+{{-- Uso básico --}}
+<x-helpdesk-widget />
+
+{{-- Con parámetros personalizados --}}
 <x-helpdesk-widget 
     height="800px" 
     width="100%" 
@@ -52,50 +93,32 @@ HELPDESK_API_KEY=tu-api-key-aqui
 />
 ```
 
-## Ejemplo de Integración
+### Publicar configuración manualmente
 
-### En tu sidebar (AdminLTE)
-
-```blade
-{{-- resources/views/layouts/sidebar.blade.php --}}
-<aside class="main-sidebar sidebar-dark-primary elevation-4">
-    <div class="sidebar">
-        {{-- ... tu menú ... --}}
-        
-        {{-- Widget de Helpdesk --}}
-        <div class="mt-3 px-3">
-            <h6 class="text-muted text-uppercase font-weight-bold mb-2">
-                <i class="fas fa-headset mr-2"></i> Centro de Soporte
-            </h6>
-            <x-helpdesk-widget height="400px" />
-        </div>
-    </div>
-</aside>
+```bash
+php artisan vendor:publish --tag=helpdeskwidget-config
 ```
 
-### En una página dedicada
+---
 
-```blade
-{{-- resources/views/soporte.blade.php --}}
-@extends('layouts.app')
+## 🎨 Integración con AdminLTE v3
 
-@section('content')
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <h1 class="mb-4">Centro de Soporte</h1>
-            <x-helpdesk-widget height="calc(100vh - 200px)" />
-        </div>
-    </div>
-</div>
-@endsection
+Si usas AdminLTE, agrega esto a tu `config/adminlte.php` en el array `menu`:
+
+```php
+['header' => 'SOPORTE'],
+[
+    'text' => 'Centro de Soporte',
+    'url' => 'helpdesk',
+    'icon' => 'fas fa-fw fa-headset',
+],
 ```
 
-## Configuración Avanzada
+---
 
-### Archivo de configuración
+## ⚙️ Configuración Avanzada
 
-Si publicaste la configuración, puedes modificar `config/helpdeskwidget.php`:
+Archivo: `config/helpdeskwidget.php`
 
 ```php
 return [
@@ -118,14 +141,9 @@ return [
 ];
 ```
 
-## Flujo de Autenticación
+---
 
-El widget maneja automáticamente la autenticación:
-
-1. **Usuario detectado**: Lee `auth()->user()` para obtener email y nombre
-2. **Verificación**: Consulta a Helpdesk si el usuario ya tiene cuenta
-3. **Login automático**: Si existe, obtiene un token JWT y muestra los tickets
-4. **Registro**: Si no existe, muestra un formulario para crear contraseña
+## 🔄 Flujo de Autenticación
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
@@ -134,14 +152,20 @@ El widget maneja automáticamente la autenticación:
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
-## Personalización
+1. **Usuario detectado**: Lee `auth()->user()` para obtener email y nombre
+2. **Verificación**: Consulta a Helpdesk si el usuario ya tiene cuenta
+3. **Login automático**: Si existe, obtiene token JWT
+4. **Registro**: Si no existe, muestra formulario para crear contraseña
+5. **Widget**: Muestra la interfaz de tickets
 
-### Atributos del usuario
+---
+
+## 🔧 Personalización del Modelo User
 
 El componente busca automáticamente estos atributos en tu modelo User:
 
 ```php
-// Intenta en orden:
+// Intentos en orden:
 $user->first_name
 $user->name        // Separa por espacios
 $user->profile->first_name  // Si existe relación
@@ -151,34 +175,53 @@ Si tu modelo tiene atributos diferentes, puedes extender el componente:
 
 ```php
 // app/View/Components/CustomHelpdeskWidget.php
-class CustomHelpdeskWidget extends \Lukehowland\HelpdeskWidget\View\Components\HelpdeskWidget
+namespace App\View\Components;
+
+use Lukehowland\HelpdeskWidget\View\Components\HelpdeskWidget;
+
+class CustomHelpdeskWidget extends HelpdeskWidget
 {
     protected function getUserFirstName($user): string
     {
         return $user->primer_nombre; // Tu atributo personalizado
     }
+    
+    protected function getUserLastName($user): string
+    {
+        return $user->apellido;
+    }
 }
 ```
 
-## Solución de Problemas
+---
+
+## 🐛 Solución de Problemas
 
 ### "API Key inválida"
-
-- Verifica que `HELPDESK_API_KEY` esté configurado correctamente
+- Verifica que `HELPDESK_API_KEY` esté en tu `.env`
 - Confirma que tu empresa esté registrada en Helpdesk
-- El API Key no debe tener espacios ni caracteres extra
 
 ### "Widget no carga"
+- Ejecuta `php artisan config:clear`
+- Verifica la URL en `HELPDESK_API_URL`
 
-- Revisa la consola del navegador para errores CORS
-- Verifica que `HELPDESK_API_URL` sea accesible desde tu servidor
-- Habilita `HELPDESK_DEBUG=true` para ver logs detallados
+### "Error de CORS"
+- El servidor Helpdesk debe permitir tu dominio
+- Contacta al administrador de Helpdesk
 
-### "Usuario no autenticado"
+### "X-Frame-Options error"
+- El servidor Helpdesk necesita permitir iframes
+- Esto se configura en el servidor, no en tu proyecto
 
-- El widget requiere que `auth()->user()` retorne un usuario
-- Asegúrate de usar el middleware `auth` en la ruta donde uses el widget
+---
 
-## Licencia
+## 📄 Licencia
 
-MIT License - Lucas De La Quintana Montenegro
+MIT License - Ver [LICENSE](LICENSE)
+
+---
+
+## 🤝 Soporte
+
+- 📧 Email: lukqs05@gmail.com
+- 🐛 Issues: [GitHub Issues](https://github.com/Lukehowland/helpdeskwidget/issues)

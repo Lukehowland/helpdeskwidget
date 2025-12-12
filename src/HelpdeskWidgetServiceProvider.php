@@ -6,6 +6,7 @@ namespace Lukehowland\HelpdeskWidget;
 
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
+use Lukehowland\HelpdeskWidget\Console\Commands\InstallCommand;
 use Lukehowland\HelpdeskWidget\View\Components\HelpdeskWidget;
 
 class HelpdeskWidgetServiceProvider extends ServiceProvider
@@ -35,12 +36,16 @@ class HelpdeskWidgetServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Publish config
+        // ================================================================
+        // PUBLISH CONFIG
+        // ================================================================
         $this->publishes([
             __DIR__ . '/../config/helpdeskwidget.php' => config_path('helpdeskwidget.php'),
         ], 'helpdeskwidget-config');
 
-        // Load views
+        // ================================================================
+        // LOAD VIEWS
+        // ================================================================
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'helpdeskwidget');
 
         // Publish views (optional)
@@ -48,7 +53,18 @@ class HelpdeskWidgetServiceProvider extends ServiceProvider
             __DIR__ . '/../resources/views' => resource_path('views/vendor/helpdeskwidget'),
         ], 'helpdeskwidget-views');
 
-        // Register Blade component
+        // ================================================================
+        // REGISTER BLADE COMPONENT
+        // ================================================================
         Blade::component('helpdesk-widget', HelpdeskWidget::class);
+
+        // ================================================================
+        // REGISTER COMMANDS (only in console)
+        // ================================================================
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                InstallCommand::class,
+            ]);
+        }
     }
 }

@@ -14,6 +14,11 @@ use Lukehowland\HelpdeskWidget\HelpdeskService;
  * Uso:
  *   <x-helpdesk-widget />
  *   <x-helpdesk-widget height="800px" />
+ * 
+ * Características:
+ * - Detecta cambio de usuario automáticamente
+ * - Maneja expiración de tokens
+ * - Auto-refresh de tokens al 80% del TTL
  */
 class HelpdeskWidget extends Component
 {
@@ -65,14 +70,24 @@ class HelpdeskWidget extends Component
         $service = app(HelpdeskService::class);
 
         // Preparar datos del usuario
+        $email = $user->email;
         $userData = [
-            'email' => $user->email,
+            'email' => $email,
             'first_name' => $this->getUserFirstName($user),
             'last_name' => $this->getUserLastName($user),
         ];
 
+        // ================================================================
+        // DETECCIÓN DE CAMBIO DE USUARIO
+        // Si el usuario actual es diferente al último, limpiar sesión
+        // ================================================================
+        if ($service->hasUserChanged($email)) {
+            // El servicio ya invalidó el cache del usuario anterior
+            // Continuamos con el flujo normal para el nuevo usuario
+        }
+
         // Intentar obtener token (login automático)
-        $tokenResult = $service->getAuthToken($userData['email']);
+        $tokenResult = $service->getAuthToken($email);
         
         if ($tokenResult['success'] && !empty($tokenResult['token'])) {
             // Usuario ya tiene cuenta, usar token

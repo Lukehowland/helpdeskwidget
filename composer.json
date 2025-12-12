@@ -1,8 +1,17 @@
 {
     "name": "lukehowland/helpdeskwidget",
     "description": "Widget embebible para integrar Helpdesk en proyectos Laravel externos",
+    "version": "2.0.0",
     "type": "library",
     "license": "MIT",
+    "keywords": [
+        "laravel",
+        "helpdesk",
+        "widget",
+        "tickets",
+        "support",
+        "adminlte"
+    ],
     "authors": [
         {
             "name": "Lucas De La Quintana Montenegro",
@@ -12,6 +21,7 @@
     "require": {
         "php": "^8.2",
         "illuminate/support": "^11.0|^12.0",
+        "illuminate/console": "^11.0|^12.0",
         "guzzlehttp/guzzle": "^7.0"
     },
     "autoload": {

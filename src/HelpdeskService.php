@@ -8,9 +8,17 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
 
 /**
  * Servicio principal para comunicarse con la API de Helpdesk.
+ * 
+ * Maneja:
+ * - Validación de API Key
+ * - Autenticación de usuarios
+ * - Cache de tokens con expiración correcta
+ * - Refresh de tokens
+ * - Detección de cambio de usuario
  */
 class HelpdeskService
 {
@@ -93,20 +101,38 @@ class HelpdeskService
      * Obtiene un token JWT para el usuario (login automático).
      * 
      * @param string $email
-     * @return array{success: bool, token?: string, error?: string}
+     * @return array{success: bool, token?: string, expiresAt?: int, error?: string}
      */
     public function getAuthToken(string $email): array
     {
         // Check cache first
-        $cacheKey = 'helpdesk_token_' . md5($email);
-        $cachedToken = Cache::get($cacheKey);
+        $cacheKey = $this->getTokenCacheKey($email);
+        $cachedData = Cache::get($cacheKey);
         
-        if ($cachedToken) {
-            return [
-                'success' => true,
-                'token' => $cachedToken,
-                'from_cache' => true,
-            ];
+        if ($cachedData && isset($cachedData['token'], $cachedData['expires_at'])) {
+            // Verificar si el token sigue válido (con margen del 20%)
+            $now = time();
+            $expiresAt = $cachedData['expires_at'];
+            $ttlTotal = $expiresAt - $cachedData['created_at'];
+            $threshold = $cachedData['created_at'] + ($ttlTotal * 0.8); // 80% del tiempo
+            
+            if ($now < $threshold) {
+                return [
+                    'success' => true,
+                    'token' => $cachedData['token'],
+                    'expiresAt' => $expiresAt,
+                    'from_cache' => true,
+                ];
+            }
+            
+            // Token está por expirar, intentar refresh
+            $refreshResult = $this->refreshToken($cachedData['token']);
+            if ($refreshResult['success']) {
+                return $refreshResult;
+            }
+            
+            // Si refresh falla, obtener token nuevo
+            $this->invalidateTokenCache($email);
         }
 
         try {
@@ -116,13 +142,21 @@ class HelpdeskService
             $data = json_decode($response->getBody()->getContents(), true);
 
             if (!empty($data['accessToken'])) {
-                // Cache the token
-                $ttl = config('helpdeskwidget.token_cache_ttl', 55);
-                Cache::put($cacheKey, $data['accessToken'], now()->addMinutes($ttl));
+                $now = time();
+                $expiresIn = $data['expiresIn'] ?? (15 * 60); // Default 15 minutos en segundos
+                $expiresAt = $now + $expiresIn;
+                
+                // Cache con la expiración REAL del token
+                Cache::put($cacheKey, [
+                    'token' => $data['accessToken'],
+                    'expires_at' => $expiresAt,
+                    'created_at' => $now,
+                ], $expiresIn);
 
                 return [
                     'success' => true,
                     'token' => $data['accessToken'],
+                    'expiresAt' => $expiresAt,
                 ];
             }
 
@@ -136,6 +170,59 @@ class HelpdeskService
             return [
                 'success' => false,
                 'error' => 'Error de autenticación',
+            ];
+        }
+    }
+
+    /**
+     * Refresca un token existente.
+     * 
+     * @param string $currentToken
+     * @return array{success: bool, token?: string, expiresAt?: int, error?: string}
+     */
+    public function refreshToken(string $currentToken): array
+    {
+        try {
+            $response = $this->client->post('/api/external/refresh', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $currentToken,
+                ],
+            ]);
+            $data = json_decode($response->getBody()->getContents(), true);
+
+            if (!empty($data['accessToken'])) {
+                $now = time();
+                $expiresIn = $data['expiresIn'] ?? (15 * 60);
+                $expiresAt = $now + $expiresIn;
+
+                // Actualizar cache con el email del token (decodificar JWT)
+                $email = $this->getEmailFromToken($currentToken);
+                if ($email) {
+                    $cacheKey = $this->getTokenCacheKey($email);
+                    Cache::put($cacheKey, [
+                        'token' => $data['accessToken'],
+                        'expires_at' => $expiresAt,
+                        'created_at' => $now,
+                    ], $expiresIn);
+                }
+
+                return [
+                    'success' => true,
+                    'token' => $data['accessToken'],
+                    'expiresAt' => $expiresAt,
+                ];
+            }
+
+            return [
+                'success' => false,
+                'error' => 'Error refrescando token',
+            ];
+        } catch (GuzzleException $e) {
+            $this->logError('refreshToken', $e);
+            
+            return [
+                'success' => false,
+                'error' => 'Error de refresh',
             ];
         }
     }
@@ -174,8 +261,63 @@ class HelpdeskService
      */
     public function invalidateTokenCache(string $email): void
     {
-        $cacheKey = 'helpdesk_token_' . md5($email);
+        $cacheKey = $this->getTokenCacheKey($email);
         Cache::forget($cacheKey);
+        
+        // También limpiar la sesión
+        Session::forget('helpdesk_widget_email');
+    }
+
+    /**
+     * Verifica si el usuario actual es diferente al último autenticado.
+     * Útil para detectar cambio de usuario y limpiar sesión anterior.
+     * 
+     * @param string $currentEmail
+     * @return bool True si el usuario cambió
+     */
+    public function hasUserChanged(string $currentEmail): bool
+    {
+        $lastEmail = Session::get('helpdesk_widget_email');
+        
+        if ($lastEmail && $lastEmail !== $currentEmail) {
+            // Usuario cambió - invalidar token anterior
+            $this->invalidateTokenCache($lastEmail);
+            return true;
+        }
+        
+        // Guardar email actual
+        Session::put('helpdesk_widget_email', $currentEmail);
+        
+        return false;
+    }
+
+    /**
+     * Extrae el email del payload de un JWT.
+     * 
+     * @param string $token
+     * @return string|null
+     */
+    private function getEmailFromToken(string $token): ?string
+    {
+        try {
+            $parts = explode('.', $token);
+            if (count($parts) !== 3) {
+                return null;
+            }
+            
+            $payload = json_decode(base64_decode($parts[1]), true);
+            return $payload['email'] ?? null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Genera la key de cache para un token.
+     */
+    private function getTokenCacheKey(string $email): string
+    {
+        return 'helpdesk_token_' . md5($email);
     }
 
     /**
