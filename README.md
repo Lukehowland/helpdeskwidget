@@ -103,16 +103,31 @@ php artisan vendor:publish --tag=helpdeskwidget-config
 
 ## 🎨 Integración con AdminLTE v3
 
-Si usas AdminLTE, agrega esto a tu `config/adminlte.php` en el array `menu`:
+El instalador crea automáticamente la vista y la ruta, pero debes agregar manualmente el enlace en el sidebar.
+
+### Paso 1: Agregar "Centro de Soporte" al sidebar
+
+Abre `config/adminlte.php` y busca el array `'menu' => [`. Al final del array (antes del cierre `]`), agrega:
 
 ```php
+// Encabezado de sección
 ['header' => 'SOPORTE'],
+
+// Elemento del menú
 [
-    'text' => 'Centro de Soporte',
-    'url' => 'helpdesk',
-    'icon' => 'fas fa-fw fa-headset',
+    'text' => 'Centro de Soporte',      // Texto que se muestra en el sidebar
+    'url' => 'helpdesk',                // Ruta creada por el instalador
+    'icon' => 'fas fa-fw fa-headset',   // Icono FontAwesome
 ],
 ```
+
+### Paso 2: Limpiar caché
+
+```bash
+php artisan config:clear
+```
+
+¡Listo! Ahora verás "Centro de Soporte" en el sidebar de AdminLTE.
 
 ---
 
